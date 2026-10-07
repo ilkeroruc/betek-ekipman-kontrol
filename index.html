@@ -15,6 +15,7 @@ body{font-family:system-ui,sans-serif;font-size:14px;color:var(--t);background:v
 .topbar{background:var(--s);border-bottom:1px solid var(--bd);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
 .card{background:var(--s);border:1px solid var(--bd);border-radius:14px;padding:1.2rem;margin-bottom:12px}
 input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--s);color:var(--t);margin-top:5px;font-family:inherit}
+input[type=checkbox],input[type=radio]{width:auto;padding:0;margin:0;flex-shrink:0;accent-color:var(--g)}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--g)}
 textarea{resize:vertical;min-height:60px}
 label{font-size:12px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
@@ -88,7 +89,7 @@ label{font-size:12px;color:var(--t2);font-weight:600;text-transform:uppercase;le
   <div style="text-align:center;padding:0 0 24px">
     <img id="loginLogo" alt="Betek" style="max-width:220px;width:75%;height:auto;margin:0 auto 16px;display:block">
     <h1 style="font-size:20px;font-weight:600">Ekipman Kontrol</h1>
-    <p style="font-size:13px;color:var(--t3);margin-top:4px">Betek — Araç Güvenlik Denetim Sistemi</p>
+    <p style="font-size:13px;color:var(--t3);margin-top:4px">Betek — İş Ekipmanı Güvenlik Denetim Sistemi</p>
     <p style="font-size:10px;color:var(--t3);margin-top:10px;opacity:.6" id="appVerBadge"></p>
   </div>
 
@@ -134,7 +135,7 @@ label{font-size:12px;color:var(--t2);font-weight:600;text-transform:uppercase;le
   <div class="card"><div class="ct">Son Kontrollerim</div><div id="opRecent"><div class="empty">Henüz kayıt yok</div></div></div>
   <div class="card" style="text-align:center">
     <div class="ct">Betek "10'suz Olmaz" Kuralı</div>
-    <img id="opRuleImg" alt="10'suz Olmaz kuralı" style="width:100%;max-width:420px;border-radius:10px;margin:0 auto;display:block">
+    <img id="opRuleImg" alt="10'suz Olmaz kuralı" style="width:100%;max-width:420px;border-radius:10px;margin:0 auto;display:block;transition:opacity .35s ease">
   </div>
 </div>
 </div>
@@ -200,7 +201,7 @@ label{font-size:12px;color:var(--t2);font-weight:600;text-transform:uppercase;le
   <div class="card"><div class="ct">Son Kontrol Kayıtları</div><div id="mgrRecent"></div></div>
   <div class="card" style="text-align:center">
     <div class="ct">Betek "10'suz Olmaz" Kuralı</div>
-    <img id="mgrRuleImg" alt="10'suz Olmaz kuralı" style="width:100%;max-width:420px;border-radius:10px;margin:0 auto;display:block">
+    <img id="mgrRuleImg" alt="10'suz Olmaz kuralı" style="width:100%;max-width:420px;border-radius:10px;margin:0 auto;display:block;transition:opacity .35s ease">
   </div>
 </div>
 </div>
@@ -262,7 +263,7 @@ var EQUIP_IMG_MAP = {forklift: FL_IMG, reach_truck: RT_IMG, transpalet: TP_IMG, 
 
 // Sürüm rozeti — GitHub Pages'e her yeni yükleme yaptığınızda bu numarayı artırın;
 // telefonda eski sürüm önbellekte takılı kaldıysa rozet değişmediğinden anlarsınız.
-var APP_VERSION = '1.1';
+var APP_VERSION = '1.4';
 var verBadgeEl = document.getElementById('appVerBadge');
 if (verBadgeEl) verBadgeEl.textContent = 'v' + APP_VERSION;
 
@@ -271,8 +272,38 @@ if (verBadgeEl) verBadgeEl.textContent = 'v' + APP_VERSION;
   var el = document.getElementById(id);
   if (el) el.src = BETEK_LOGO;
 });
-function pickRandomRuleImg() {
-  return RULE_IMGS[Math.floor(Math.random() * RULE_IMGS.length)];
+// "10'suz Olmaz" kuralları: ana ekranda 15 sn'de bir değişir (10 kuralın hepsi karışık sırayla gösterilir)
+var RULE_ROTATE_MS = 15000;
+var ruleOrder = [], ruleIdx = 0, ruleTimer = null;
+function nextRuleImg() {
+  if (ruleIdx >= ruleOrder.length) {
+    var last = ruleOrder.length ? ruleOrder[ruleOrder.length-1] : -1;
+    ruleOrder = RULE_IMGS.map(function(_, i){ return i; });
+    for (var i = ruleOrder.length - 1; i > 0; i--) { var j = Math.floor(Math.random()*(i+1)); var t = ruleOrder[i]; ruleOrder[i] = ruleOrder[j]; ruleOrder[j] = t; }
+    if (ruleOrder[0] === last && ruleOrder.length > 1) { var x = ruleOrder[0]; ruleOrder[0] = ruleOrder[1]; ruleOrder[1] = x; }
+    ruleIdx = 0;
+  }
+  return RULE_IMGS[ruleOrder[ruleIdx++]];
+}
+function setRuleImg(src, animate) {
+  ['opRuleImg','mgrRuleImg'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (!animate) { el.src = src; el.style.opacity = 1; return; }
+    el.style.opacity = 0;
+    setTimeout(function(){ el.src = src; el.style.opacity = 1; }, 350);
+  });
+}
+function stopRuleRotation() { if (ruleTimer) { clearInterval(ruleTimer); ruleTimer = null; } }
+function startRuleRotation() {
+  stopRuleRotation();
+  setRuleImg(nextRuleImg(), false);
+  ruleTimer = setInterval(function(){
+    var opOn = document.getElementById('sOpHome').classList.contains('active');
+    var mgrOn = document.getElementById('sMgrHome').classList.contains('active');
+    if (!opOn && !mgrOn) return;           // ana ekranda değilse bekle
+    setRuleImg(nextRuleImg(), true);
+  }, RULE_ROTATE_MS);
 }
 
 // ── VERİ ────────────────────────────────────────────────────────────
@@ -318,10 +349,16 @@ function recordToDbRow(r){ return {id:r.id, ts:r.ts, op_id:r.opId, op_name:r.opN
 
 function settingsFromDb(s) {
   return {managerEmail:s.manager_email||'', ccEmails:s.cc_emails||[], ejKey:s.ej_key||'', ejSvc:s.ej_svc||'', ejTpl:s.ej_tpl||'',
+          ejTplReminder:s.ej_tpl_reminder||'',
+          reminderEnabled:(s.reminder_enabled===false?false:true),
+          reminderDelayMin:(s.reminder_delay_min==null?20:s.reminder_delay_min),
+          reminderDays:(s.reminder_days==null?'1,2,3,4,5':s.reminder_days),
           shift1:s.shift1||'07:30', dead1:s.dead1||'08:00', shift2:s.shift2||'15:30', dead2:s.dead2||'16:00'};
 }
 function settingsToDbRow(s) {
   return {manager_email:s.managerEmail, cc_emails:s.ccEmails||[], ej_key:s.ejKey, ej_svc:s.ejSvc, ej_tpl:s.ejTpl,
+          ej_tpl_reminder:s.ejTplReminder||'', reminder_enabled:s.reminderEnabled!==false,
+          reminder_delay_min:s.reminderDelayMin, reminder_days:s.reminderDays,
           shift1:s.shift1, dead1:s.dead1, shift2:s.shift2, dead2:s.dead2};
 }
 function sbUpdate(table, query, row) {
@@ -363,7 +400,7 @@ var DB = {
   users: [],
   equipments: [],
   records: [],
-  settings: {managerEmail:'yonetici@betek.com.tr',shift1:'07:30',dead1:'08:00',shift2:'15:30',dead2:'16:00',ejKey:'',ejSvc:'',ejTpl:''}
+  settings: {managerEmail:'yonetici@betek.com.tr',ccEmails:[],ejTplReminder:'',reminderEnabled:true,reminderDelayMin:20,reminderDays:'1,2,3,4,5',shift1:'07:30',dead1:'08:00',shift2:'15:30',dead2:'16:00',ejKey:'',ejSvc:'',ejTpl:''}
 };
 
 // Kullanıcının yetkili olduğu ekipmanları döndür
@@ -738,6 +775,7 @@ function doLogin() {
 }
 
 function logout() {
+  stopRuleRotation();
   CU = null; CEType = null; answers = {};
   document.getElementById('lUser').value = '';
   document.getElementById('lPass').value = '';
@@ -771,7 +809,7 @@ function goOpHome() {
   document.getElementById('opName').textContent = CU.name;
   document.getElementById('opAv').textContent = ini(CU.name);
   renderEquipGrid(); renderOpRecent(); checkShift();
-  document.getElementById('opRuleImg').src = pickRandomRuleImg();
+  startRuleRotation();
 }
 
 function renderEquipGrid() {
@@ -973,7 +1011,7 @@ function goMgrHome() {
   document.getElementById('adminBtn').style.display=CU.role==='admin'?'':'none';
   document.getElementById('mgrDate').textContent=new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   renderMgrEquips(); renderMgrRecent();
-  document.getElementById('mgrRuleImg').src = pickRandomRuleImg();
+  startRuleRotation();
 }
 
 function renderMgrEquips() {
@@ -1222,7 +1260,17 @@ function renderAdminSettings(el) {
     +'<div class="fg"><label>Genel Yedek Yönetici E-posta</label><input id="s_m" value="'+s.managerEmail+'" placeholder="yonetici@betek.com.tr"></div>'
     +'<div class="alert ai" style="font-size:12px;margin:-4px 0 10px">Her lokasyonun kendi yönetici e-postaları Admin › Lokasyonlar sekmesinden ayrı ayrı tanımlanır — uygunsuzluk maili önce o lokasyonun yöneticilerine gider. Bir lokasyon için e-posta tanımlı değilse buradaki genel adrese düşer.</div>'
     +'<div class="fg"><label>Sabit CC Listesi (her bildirime eklenir, virgülle ayırın)</label><input id="s_cc" value="'+ccStr+'" placeholder="isg@betek.com.tr, kalite@betek.com.tr"></div>'
-    +'<div class="fg"><label>EmailJS Public Key</label><input id="s_k" value="'+(s.ejKey||'')+'"></div><div class="fg"><label>EmailJS Service ID</label><input id="s_sv" value="'+(s.ejSvc||'')+'"></div><div class="fg"><label>EmailJS Template ID</label><input id="s_t" value="'+(s.ejTpl||'')+'"></div></div><div class="card"><div class="ct">Vardiya Saatleri</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="fg"><label>1. Vardiya Başlangıç</label><input type="time" id="s_s1" value="'+s.shift1+'"></div><div class="fg"><label>1. Vardiya Son</label><input type="time" id="s_d1" value="'+s.dead1+'"></div><div class="fg"><label>2. Vardiya Başlangıç</label><input type="time" id="s_s2" value="'+s.shift2+'"></div><div class="fg"><label>2. Vardiya Son</label><input type="time" id="s_d2" value="'+s.dead2+'"></div></div><button class="btn btn-g btn-full" style="margin-top:4px" id="btnSaveSettings">Ayarları Kaydet</button></div><div class="alert ai" style="font-size:12px">EmailJS kurulumu: emailjs.com üzerinden ücretsiz hesap açın, Gmail/Outlook bağlayın, Service ve Template oluşturun, keyleri buraya girin.</div>';
+    +'<div class="fg"><label>EmailJS Public Key</label><input id="s_k" value="'+(s.ejKey||'')+'"></div><div class="fg"><label>EmailJS Service ID</label><input id="s_sv" value="'+(s.ejSvc||'')+'"></div><div class="fg"><label>EmailJS Template ID</label><input id="s_t" value="'+(s.ejTpl||'')+'"></div><div class="fg"><label>EmailJS Hatırlatma Şablon ID (kontrol yapılmadı maili için)</label><input id="s_tr" value="'+(s.ejTplReminder||'')+'" placeholder="template_..."></div></div>'
+    +'<div class="card"><div class="ct">Kontrol Hatırlatma Maili</div>'
+    +'<div class="alert ai" style="font-size:12px;margin:0 0 10px">Vardiya başlangıcından belirlenen süre sonra hâlâ kontrolü yapılmamış ekipman varsa, o lokasyonun yöneticilerine (+ sabit CC) tek bir mail gider. Mail sunucuda otomatik gönderilir; uygulamanın açık olması gerekmez. Kurulum SQL\'i çalıştırılmamışsa bu ayarlar kaydedilemez.</div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px"><input type="checkbox" id="s_re"'+(s.reminderEnabled!==false?' checked':'')+'> Hatırlatma maili açık</label>'
+    +'<div class="fg"><label>Vardiya başlangıcından kaç dakika sonra (dk)</label><input type="number" id="s_rd" min="1" max="240" value="'+s.reminderDelayMin+'"></div>'
+    +'<div class="fg"><label>Hatırlatma günleri</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">'
+    +[['1','Pzt'],['2','Sal'],['3','Çar'],['4','Per'],['5','Cum'],['6','Cmt'],['7','Paz']].map(function(d){
+        return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" class="rem-day" value="'+d[0]+'"'+((','+String(s.reminderDays).replace(/ /g,'')+',').indexOf(','+d[0]+',')>=0?' checked':'')+'> '+d[1]+'</label>';
+      }).join('')
+    +'</div></div></div>'
+    +'<div class="card"><div class="ct">Vardiya Saatleri</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="fg"><label>1. Vardiya Başlangıç</label><input type="time" id="s_s1" value="'+s.shift1+'"></div><div class="fg"><label>1. Vardiya Son</label><input type="time" id="s_d1" value="'+s.dead1+'"></div><div class="fg"><label>2. Vardiya Başlangıç</label><input type="time" id="s_s2" value="'+s.shift2+'"></div><div class="fg"><label>2. Vardiya Son</label><input type="time" id="s_d2" value="'+s.dead2+'"></div></div><button class="btn btn-g btn-full" style="margin-top:4px" id="btnSaveSettings">Ayarları Kaydet</button></div><div class="alert ai" style="font-size:12px">EmailJS kurulumu: emailjs.com üzerinden ücretsiz hesap açın, Gmail/Outlook bağlayın, Service ve Template oluşturun, keyleri buraya girin.</div>';
   document.getElementById('btnSaveSettings').addEventListener('click', function(){
     var newSettings = {
       managerEmail: document.getElementById('s_m').value.trim(),
@@ -1230,6 +1278,10 @@ function renderAdminSettings(el) {
       ejKey: document.getElementById('s_k').value.trim(),
       ejSvc: document.getElementById('s_sv').value.trim(),
       ejTpl: document.getElementById('s_t').value.trim(),
+      ejTplReminder: document.getElementById('s_tr').value.trim(),
+      reminderEnabled: document.getElementById('s_re').checked,
+      reminderDelayMin: Math.max(1, Math.min(240, parseInt(document.getElementById('s_rd').value, 10) || 20)),
+      reminderDays: Array.prototype.map.call(el.querySelectorAll('.rem-day:checked'), function(c){return c.value;}).join(','),
       shift1: document.getElementById('s_s1').value,
       dead1: document.getElementById('s_d1').value,
       shift2: document.getElementById('s_s2').value,
